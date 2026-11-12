@@ -135,9 +135,15 @@ class FamilyChoreColumns extends HTMLElement {
     try {
       await this.home.callService("todo", "update_item", {
         item: item.uid, status: "needs_action",
-        ...(item.dueDate ? { due_date: item.dueDate } : {}),
       }, { entity_id: this.config.entity });
-      await this.refresh();
+      if (item.dueDate) {
+        await this.home.callService("todo", "update_item", {
+          item: item.uid, due_date: item.dueDate,
+        }, { entity_id: this.config.entity });
+      }
+      // Todoist's read path can briefly lag the write, so give it a moment
+      // before trusting a refresh over the optimistic state above.
+      setTimeout(() => void this.refresh(), 4000);
     } catch {
       this.reopened.delete(uid);
       this.completed = previousCompleted;

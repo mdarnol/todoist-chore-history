@@ -13,8 +13,8 @@ An existing YAML setup keeps working. After verifying the web setup, you can rem
 In **Settings → Dashboards → Resources**, register the following URLs as **JavaScript modules**, with `?v=` set to the version in `manifest.json` (prevents your browser from serving a stale cached copy after an update). If replacing an earlier version of a card, edit its existing resource instead of keeping two entries.
 
 ```text
-/todoist_chore_history/family-chore-columns.js?v=0.2.11
-/todoist_chore_history/family-photo-wall.js?v=0.2.11
+/todoist_chore_history/family-chore-columns.js?v=0.2.12
+/todoist_chore_history/family-photo-wall.js?v=0.2.12
 ```
 
 Use one chore card per person's view:
