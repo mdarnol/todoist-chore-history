@@ -1,0 +1,50 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect Todoist",
+        "description": "Choose up to four Home Assistant chore lists and enter their Todoist project IDs.",
+        "data": {
+          "token": "Todoist API token",
+          "entity_1": "Chore list 1",
+          "project_1": "Todoist project ID 1",
+          "entity_2": "Chore list 2",
+          "project_2": "Todoist project ID 2",
+          "entity_3": "Chore list 3",
+          "project_3": "Todoist project ID 3",
+          "entity_4": "Chore list 4",
+          "project_4": "Todoist project ID 4"
+        }
+      },
+      "reconfigure": {
+        "title": "Edit Todoist settings",
+        "description": "Leave the token blank to keep the saved token.",
+        "data": {
+          "token": "Todoist API token",
+          "entity_1": "Chore list 1",
+          "project_1": "Todoist project ID 1",
+          "entity_2": "Chore list 2",
+          "project_2": "Todoist project ID 2",
+          "entity_3": "Chore list 3",
+          "project_3": "Todoist project ID 3",
+          "entity_4": "Chore list 4",
+          "project_4": "Todoist project ID 4"
+        }
+      }
+    },
+    "error": {
+      "token_required": "Enter a Todoist API token.",
+      "invalid_auth": "Todoist rejected the API token.",
+      "incomplete_mapping": "Each mapping needs a chore list and a project ID.",
+      "duplicate_entity": "Choose each chore list only once.",
+      "invalid_project": "Enter a valid Todoist project ID.",
+      "mapping_required": "Add at least one chore list and project ID.",
+      "project_unavailable": "Check the project IDs and whether the Todoist account can access each project.",
+      "cannot_connect": "Unable to reach the Todoist API."
+    },
+    "abort": {
+      "already_configured": "The integration is already configured.",
+      "reconfigure_successful": "Todoist settings updated."
+    }
+  }
+}
