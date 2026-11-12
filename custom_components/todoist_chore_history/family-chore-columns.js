@@ -89,6 +89,16 @@ class FamilyChoreColumns extends HTMLElement {
     return new Date(year, month - 1, day).toLocaleDateString(undefined, options);
   }
 
+  withAlpha(hex, alpha) {
+    if (!hex) return "transparent";
+    const value = hex.replace("#", "");
+    const bigint = parseInt(value, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
   animateMove(uid, fromRect) {
     if (!fromRect) return;
     const toRow = this.shadowRoot.querySelector(`[data-uid="${uid}"]`);
@@ -322,6 +332,9 @@ class FamilyChoreColumns extends HTMLElement {
     ];
     groups.forEach((items, index) => {
       const section = document.createElement("section");
+      if ((index === 1 || index === 2) && this.config.color) {
+        section.style.background = this.withAlpha(this.config.color, 0.2);
+      }
       const heading = document.createElement("h2");
       heading.textContent = titles[index];
       section.append(heading);
