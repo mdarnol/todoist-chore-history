@@ -13,8 +13,8 @@ An existing YAML setup keeps working. After verifying the web setup, you can rem
 In **Settings → Dashboards → Resources**, register the following URLs as **JavaScript modules**, with `?v=` set to the version in `manifest.json` (prevents your browser from serving a stale cached copy after an update). If replacing an earlier version of a card, edit its existing resource instead of keeping two entries.
 
 ```text
-/todoist_chore_history/family-chore-columns.js?v=0.2.6
-/todoist_chore_history/family-photo-wall.js?v=0.2.6
+/todoist_chore_history/family-chore-columns.js?v=0.2.7
+/todoist_chore_history/family-photo-wall.js?v=0.2.7
 ```
 
 Use one chore card per person's view:
@@ -24,7 +24,7 @@ type: custom:family-chore-columns
 entity: todo.example_chores
 ```
 
-`family-photo-wall` is a dual-pane photo screensaver card meant for a `wallpanel` overlay. It cycles two portrait photos from an Immich album side by side, each independently timed, with its own location/date caption:
+`family-photo-wall` is a photo screensaver card meant for a `wallpanel` overlay. It cycles random photos from an Immich album: a landscape photo shows full-screen, and a portrait photo is paired with another portrait photo side by side. Each photo gets its own location/date caption:
 
 ```yaml
 type: custom:family-photo-wall

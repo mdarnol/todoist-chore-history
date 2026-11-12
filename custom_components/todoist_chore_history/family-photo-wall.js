@@ -2,9 +2,8 @@ class FamilyPhotoWall extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
-    this.panels = [null, null];
-    this.queues = [[], []];
-    this.cycling = [false, false];
+    this.queue = [];
+    this.current = null;
   }
 
   setConfig(config) {
@@ -16,18 +15,14 @@ class FamilyPhotoWall extends HTMLElement {
   }
 
   connectedCallback() {
-    void this.cycle(0);
-    void this.cycle(1);
+    void this.advance();
     const seconds = (this.config?.display_time || 60) * 1000;
-    this.timers = [
-      setInterval(() => void this.cycle(0), seconds),
-      setInterval(() => void this.cycle(1), seconds),
-    ];
+    this.timer = setInterval(() => void this.advance(), seconds);
   }
 
   disconnectedCallback() {
-    (this.timers || []).forEach(clearInterval);
-    this.panels.forEach(panel => panel?.url && URL.revokeObjectURL(panel.url));
+    clearInterval(this.timer);
+    (this.current || []).forEach(item => URL.revokeObjectURL(item.url));
   }
 
   async request(path, options = {}) {
@@ -53,39 +48,57 @@ class FamilyPhotoWall extends HTMLElement {
     return match.id;
   }
 
-  async fill(index) {
+  orientation(asset) {
+    const height = asset.exifInfo?.exifImageHeight ?? asset.height;
+    const width = asset.exifInfo?.exifImageWidth ?? asset.width;
+    return height > width ? "portrait" : "landscape";
+  }
+
+  async fillQueue() {
     const albumId = await this.albumId();
-    const other = this.panels[1 - index]?.asset.id;
-    for (let attempt = 0; attempt < 4 && this.queues[index].length === 0; attempt++) {
+    for (let attempt = 0; attempt < 4 && this.queue.length < 2; attempt++) {
       const assets = await (await this.request("/search/random", {
         method: "POST",
         body: JSON.stringify({ albumIds: [albumId], withExif: true, type: "IMAGE", size: 30 }),
       })).json();
-      this.queues[index] = assets.filter(asset => {
-        const height = asset.exifInfo?.exifImageHeight ?? asset.height;
-        const width = asset.exifInfo?.exifImageWidth ?? asset.width;
-        return height > width && asset.id !== other;
-      });
+      this.queue.push(...assets);
     }
   }
 
-  async cycle(index) {
-    if (!this.config || this.cycling[index]) return;
-    this.cycling[index] = true;
+  async nextSlide() {
+    if (this.queue.length === 0) await this.fillQueue();
+    const first = this.queue.shift();
+    if (!first) return null;
+    if (this.orientation(first) === "landscape") return [first];
+
+    let partnerIndex = this.queue.findIndex(asset => this.orientation(asset) === "portrait");
+    if (partnerIndex === -1) {
+      await this.fillQueue();
+      partnerIndex = this.queue.findIndex(asset => this.orientation(asset) === "portrait");
+    }
+    if (partnerIndex === -1) return [first];
+    const [partner] = this.queue.splice(partnerIndex, 1);
+    return [first, partner];
+  }
+
+  async advance() {
+    if (!this.config || this.advancing) return;
+    this.advancing = true;
     try {
-      if (this.queues[index].length === 0) await this.fill(index);
-      const asset = this.queues[index].shift();
-      if (!asset) return;
-      const blob = await (await this.request(`/assets/${asset.id}/thumbnail?size=preview`)).blob();
-      const url = URL.createObjectURL(blob);
-      const previous = this.panels[index]?.url;
-      this.panels[index] = { asset, url };
-      this.renderPanel(index);
-      if (previous) URL.revokeObjectURL(previous);
+      const slide = await this.nextSlide();
+      if (!slide) return;
+      const loaded = await Promise.all(slide.map(async asset => {
+        const blob = await (await this.request(`/assets/${asset.id}/thumbnail?size=preview`)).blob();
+        return { asset, url: URL.createObjectURL(blob) };
+      }));
+      const previous = this.current;
+      this.current = loaded;
+      this.renderSlide();
+      (previous || []).forEach(item => URL.revokeObjectURL(item.url));
     } catch {
-      // Keep showing the current photo; the next interval will retry.
+      // Keep showing the current slide; the next interval will retry.
     } finally {
-      this.cycling[index] = false;
+      this.advancing = false;
     }
   }
 
@@ -104,14 +117,18 @@ class FamilyPhotoWall extends HTMLElement {
     });
   }
 
-  renderPanel(index) {
-    const panel = this.panels[index];
-    const img = this.shadowRoot.querySelector(`[data-panel="${index}"] img`);
-    const caption = this.shadowRoot.querySelector(`[data-panel="${index}"] .caption`);
-    if (!panel || !img || !caption) return;
-    img.src = panel.url;
-    const lines = [this.location(panel.asset.exifInfo), this.date(panel.asset.exifInfo)].filter(Boolean);
-    caption.innerHTML = lines.map(line => `<div>${line}</div>`).join("");
+  renderSlide() {
+    const wall = this.shadowRoot?.querySelector(".wall");
+    if (!wall || !this.current) return;
+    wall.innerHTML = this.current.map(item => {
+      const lines = [this.location(item.asset.exifInfo), this.date(item.asset.exifInfo)].filter(Boolean);
+      return `
+        <div class="panel">
+          <img src="${item.url}" alt="">
+          <div class="caption">${lines.map(line => `<div>${line}</div>`).join("")}</div>
+        </div>
+      `;
+    }).join("");
   }
 
   render() {
@@ -128,13 +145,9 @@ class FamilyPhotoWall extends HTMLElement {
         }
         .caption div:first-child { font-weight: 400; }
       </style>
-      <div class="wall">
-        <div class="panel" data-panel="0"><img alt=""><div class="caption"></div></div>
-        <div class="panel" data-panel="1"><img alt=""><div class="caption"></div></div>
-      </div>
+      <div class="wall"></div>
     `;
-    this.renderPanel(0);
-    this.renderPanel(1);
+    this.renderSlide();
   }
 }
 
