@@ -114,6 +114,62 @@ class FamilyChoreColumns extends HTMLElement {
     }
   }
 
+  edit(item) {
+    const dialog = document.createElement("dialog");
+    dialog.className = "chore-editor";
+    dialog.innerHTML = `<form>
+      <h2>Edit chore</h2>
+      <label>Name<input name="summary" required></label>
+      <label>Description<textarea name="description" rows="5"></textarea></label>
+      <label>Due date<input name="due" type="date"></label>
+      <p role="alert" hidden></p>
+      <footer><button type="button">Cancel</button><button type="submit">Save</button></footer>
+    </form>`;
+    const form = dialog.querySelector("form");
+    const { summary, description, due } = form.elements;
+    summary.value = item.summary;
+    description.value = item.description ?? "";
+    due.value = item.date ?? "";
+    const originalDate = due.value;
+    const entity = this.config.entity;
+    const cancel = dialog.querySelector('button[type="button"]');
+    const save = dialog.querySelector('button[type="submit"]');
+    const error = dialog.querySelector('[role="alert"]');
+    cancel.addEventListener("click", () => dialog.close());
+    dialog.addEventListener("close", () => dialog.remove(), { once: true });
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      const name = summary.value.trim();
+      if (!name || (!due.value && originalDate)) {
+        error.textContent = !name ? "Enter a chore name." : "Select a due date.";
+        error.hidden = false;
+        return;
+      }
+      const changes = {};
+      if (name !== item.summary) changes.rename = name;
+      if (description.value !== (item.description ?? "")) changes.description = description.value;
+      if (due.value !== originalDate) changes.due_date = due.value;
+      if (!Object.keys(changes).length) {
+        dialog.close();
+        return;
+      }
+      save.disabled = true;
+      try {
+        await this.home.callService("todo", "update_item", {
+          item: item.uid, ...changes,
+        }, { entity_id: entity });
+        dialog.close();
+        await this.refresh();
+      } catch {
+        error.textContent = "Could not save this chore. Try again.";
+        error.hidden = false;
+        save.disabled = false;
+      }
+    });
+    this.shadowRoot.append(dialog);
+    dialog.showModal();
+  }
+
   groups() {
     const zone = this.home?.config?.time_zone;
     const formatter = new Intl.DateTimeFormat("en-CA", {
@@ -145,6 +201,7 @@ class FamilyChoreColumns extends HTMLElement {
 
   render() {
     if (!this.config) return;
+    if (this.shadowRoot.querySelector("dialog[open]")) return;
     this.shadowRoot.innerHTML = `<style>
       :host { display:block; color:var(--primary-text-color); }
       .columns { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); }
@@ -160,6 +217,19 @@ class FamilyChoreColumns extends HTMLElement {
       small { display:block; margin-top:5px; color:var(--secondary-text-color); }
       button { color:inherit; font:inherit; text-align:start; cursor:pointer; background:none;
         border:0; padding:0; width:100%; min-height:44px; }
+      .chore-row { display:grid; grid-template-columns:44px minmax(0,1fr); align-items:start; }
+      .chore-check { text-align:center; font-size:1.3rem; }
+      .chore-title:is(button):hover { text-decoration:underline; }
+      .chore-editor { box-sizing:border-box; width:min(480px, calc(100vw - 32px));
+        border:1px solid var(--divider-color); border-radius:12px; padding:20px;
+        color:var(--primary-text-color); background:var(--card-background-color, white); }
+      .chore-editor::backdrop { background:rgb(0 0 0 / .5); }
+      .chore-editor label { display:grid; gap:4px; margin:12px 0; }
+      .chore-editor input, .chore-editor textarea { font:inherit; color:inherit;
+        background:var(--secondary-background-color); border:1px solid var(--divider-color);
+        border-radius:4px; padding:8px; }
+      .chore-editor footer { display:flex; justify-content:flex-end; gap:12px; }
+      .chore-editor button { width:auto; padding:0 12px; color:var(--primary-color); }
       @media(max-width:850px) {
         .columns { grid-template-columns:1fr; }
         section { border-inline-start:0; border-block-end:1px solid var(--divider-color); }
@@ -183,35 +253,43 @@ class FamilyChoreColumns extends HTMLElement {
       }
       for (const item of items) {
         const row = document.createElement("li");
-        const readOnly = index === 0 && (item.recurring || item.awaitingHistory);
-        const label = document.createElement(readOnly ? "span" : "button");
-        label.className = "chore-title";
-        label.textContent = `${index === 0 ? "✓" : "☐"} ${item.summary}`;
-        if (index !== 0) {
-          label.disabled = this.pending.has(item.uid);
-          label.setAttribute("aria-label", `Complete ${item.summary}`);
-          label.addEventListener("click", () => void this.complete(item));
+        row.className = "chore-row";
+        const finished = index === 0;
+        const readOnly = finished && (item.recurring || item.awaitingHistory);
+        const check = document.createElement("button");
+        check.className = "chore-check";
+        check.type = "button";
+        check.setAttribute("role", "checkbox");
+        check.setAttribute("aria-checked", String(finished));
+        check.setAttribute("aria-label", `${finished ? "Reopen" : "Complete"} ${item.summary}`);
+        check.textContent = finished ? "☑" : "☐";
+        check.disabled = readOnly || this.pending.has(item.uid);
+        check.addEventListener("click", () => void (finished ? this.reopen(item) : this.complete(item)));
+        const details = document.createElement("div");
+        const title = document.createElement(finished ? "span" : "button");
+        title.className = "chore-title";
+        title.textContent = item.summary;
+        if (!finished) {
+          title.type = "button";
+          title.setAttribute("aria-label", `Edit ${item.summary}`);
+          title.addEventListener("click", () => this.edit(item));
         }
-        if (index === 0 && !readOnly) {
-          label.disabled = this.pending.has(item.uid);
-          label.setAttribute("aria-label", `Reopen ${item.summary}`);
-          label.addEventListener("click", () => void this.reopen(item));
-        }
-        row.append(label);
+        details.append(title);
         if (item.description?.trim()) {
           const description = document.createElement("span");
           description.className = "description";
           description.textContent = item.description;
-          row.append(description);
+          details.append(description);
         }
         const date = document.createElement("small");
-        date.textContent = index === 0 ? new Date(item.completedAt).toLocaleDateString() : item.date;
-        row.append(date);
-        if (item.awaitingHistory) {
+        date.textContent = finished ? new Date(item.completedAt).toLocaleDateString() : item.date;
+        details.append(date);
+        if (readOnly) {
           const status = document.createElement("small");
-          status.textContent = "Waiting for Todoist history";
-          row.append(status);
+          status.textContent = item.awaitingHistory ? "Waiting for Todoist history" : "Recurring completion";
+          details.append(status);
         }
+        row.append(check, details);
         list.append(row);
       }
       section.append(list);
