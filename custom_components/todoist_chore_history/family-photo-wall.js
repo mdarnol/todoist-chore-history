@@ -140,10 +140,10 @@ class FamilyPhotoWall extends HTMLElement {
         .panel img { width: 100%; height: 100%; object-fit: contain; display: block; }
         .caption {
           position: absolute; bottom: 28px; left: 0; right: 0; text-align: center;
-          color: #ffffff; font-size: 1.15rem; font-weight: 300; line-height: 1.4;
-          text-shadow: 0 2px 10px rgba(0, 0, 0, 0.65);
+          color: #ffffff; font-size: 1.15rem; font-weight: 600; line-height: 1.4;
+          text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
         }
-        .caption div:first-child { font-weight: 400; }
+        .caption div:first-child { font-weight: 700; }
       </style>
       <div class="wall"></div>
     `;
