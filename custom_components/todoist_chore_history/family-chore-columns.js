@@ -53,7 +53,12 @@ class FamilyChoreColumns extends HTMLElement {
         this.completed = historyItems.map(item => ({
           ...item, completedAt: Date.parse(item.completedAt),
         }));
-        for (const item of this.completed) this.awaitingHistory.delete(item.uid);
+        for (const item of this.completed) {
+          const waiting = this.awaitingHistory.get(item.uid);
+          if (waiting && item.completedAt >= waiting.completedAt - 10000) {
+            this.awaitingHistory.delete(item.uid);
+          }
+        }
       }
       for (const [uid, item] of this.awaitingHistory) {
         if (item.completedAt < Date.now() - 86400000) this.awaitingHistory.delete(uid);
@@ -97,7 +102,7 @@ class FamilyChoreColumns extends HTMLElement {
         item: item.uid, status: "completed",
       }, { entity_id: this.config.entity });
       const uid = String(item.uid);
-      if (!this.completed.some(row => row.uid === uid)) {
+      if (!this.completed.some(row => row.uid === uid && row.completedAt >= Date.now() - 10000)) {
         this.awaitingHistory.set(uid, {
           ...item, uid, completedAt: Date.now(), awaitingHistory: true,
         });
