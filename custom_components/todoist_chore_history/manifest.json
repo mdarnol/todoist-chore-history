@@ -1,7 +1,7 @@
 {
   "domain": "todoist_chore_history",
   "name": "Todoist Chore History",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "documentation": "https://developer.todoist.com/api/v1/",
   "iot_class": "cloud_polling",
   "codeowners": [],

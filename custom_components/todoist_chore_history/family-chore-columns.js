@@ -90,6 +90,7 @@ class FamilyChoreColumns extends HTMLElement {
     try {
       await this.home.callService("todo", "update_item", {
         item: item.uid, status: "needs_action",
+        ...(item.dueDate ? { due_date: item.dueDate } : {}),
       }, { entity_id: this.config.entity });
       const uid = String(item.uid);
       this.reopened.set(uid, item.completedAt);
@@ -115,8 +116,9 @@ class FamilyChoreColumns extends HTMLElement {
       }, { entity_id: this.config.entity });
       const uid = String(item.uid);
       if (!this.completed.some(row => row.uid === uid && row.completedAt >= Date.now() - 10000)) {
+        const dueDate = item.due ? (item.due.length === 10 ? item.due : item.due.slice(0, 10)) : null;
         this.awaitingHistory.set(uid, {
-          ...item, uid, completedAt: Date.now(), awaitingHistory: true,
+          ...item, uid, completedAt: Date.now(), awaitingHistory: true, dueDate,
         });
       }
       this.items = this.items.filter(row => row.uid !== item.uid);

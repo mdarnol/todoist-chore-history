@@ -76,6 +76,9 @@ async def async_setup(hass, config):
             cursors.add(cursor)
             params["cursor"] = cursor
 
+    def local_date(value):
+        return value.split("T")[0] if value else None
+
     async def get_recent(call):
         entity = call.data["entity_id"]
         items, token = await recent(entity)
@@ -85,6 +88,7 @@ async def async_setup(hass, config):
             "description": item.get("description") or "",
             "completedAt": item["completed_at"],
             "recurring": bool((item.get("due") or {}).get("is_recurring")),
+            "dueDate": local_date((item.get("due") or {}).get("date")),
         } for item in items if item.get("completed_at")]
 
         runtime = hass.data[DOMAIN]
@@ -121,6 +125,10 @@ async def async_setup(hass, config):
                     "description": details.get("description") or "",
                     "completedAt": completed_at,
                     "recurring": True,
+                    "dueDate": local_date(
+                        details.get("completed_due_date_local")
+                        or details.get("completedDueDateLocal")
+                    ),
                 })
             cursor = page.get("next_cursor")
             if not cursor:
