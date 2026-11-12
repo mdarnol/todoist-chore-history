@@ -72,14 +72,58 @@ async def async_setup(hass, config):
             params["cursor"] = cursor
 
     async def get_recent(call):
-        items, _ = await recent(call.data["entity_id"])
-        return {"items": [{
+        entity = call.data["entity_id"]
+        items, token = await recent(entity)
+        history = [{
             "uid": str(item["id"]),
             "summary": item["content"],
             "description": item.get("description") or "",
             "completedAt": item["completed_at"],
             "recurring": bool((item.get("due") or {}).get("is_recurring")),
-        } for item in items if item.get("completed_at")]}
+        } for item in items if item.get("completed_at")]
+
+        runtime = hass.data[DOMAIN]
+        project = (runtime["entry"] or runtime["legacy"])["projects"][entity]
+        now = datetime.now(timezone.utc)
+        since = now - timedelta(hours=24)
+        params = {
+            "parent_project_id": project,
+            "object_type": "item",
+            "event_type": "completed",
+            "date_from": since.isoformat(),
+            "date_to": now.isoformat(),
+        }
+        seen = {(item["uid"], datetime.fromisoformat(item["completedAt"])) for item in history}
+        cursors = set()
+        while True:
+            page = await request(token, "GET", "/activities", params)
+            for event in page["results"]:
+                details = event.get("extra_data") or {}
+                if not (details.get("is_recurring") or details.get("isRecurring")):
+                    continue
+                if str(event.get("parent_project_id")) != project or not details.get("content"):
+                    continue
+                uid = str(event["object_id"])
+                completed_at = event["event_date"]
+                timestamp = datetime.fromisoformat(completed_at)
+                key = (uid, timestamp)
+                if not since <= timestamp < now or key in seen:
+                    continue
+                seen.add(key)
+                history.append({
+                    "uid": uid,
+                    "summary": details["content"],
+                    "description": details.get("description") or "",
+                    "completedAt": completed_at,
+                    "recurring": True,
+                })
+            cursor = page.get("next_cursor")
+            if not cursor:
+                return {"items": history}
+            if cursor in cursors:
+                raise HomeAssistantError("Todoist returned a repeated activity page")
+            cursors.add(cursor)
+            params["cursor"] = cursor
 
     async def reopen(call):
         entity = call.data["entity_id"]
