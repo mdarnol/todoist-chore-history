@@ -24,7 +24,8 @@ CONFIG_SCHEMA = vol.Schema({
 
 
 async def async_setup(hass, config):
-    settings = config[DOMAIN]
+    settings = config.get(DOMAIN)
+    hass.data[DOMAIN] = {"legacy": settings, "entry": None}
     await hass.http.async_register_static_paths([
         StaticPathConfig(
             "/todoist_chore_history/family-chore-columns.js",
@@ -33,9 +34,9 @@ async def async_setup(hass, config):
         ),
     ])
     session = async_get_clientsession(hass)
-    headers = {"Authorization": "Bearer " + settings["token"]}
 
-    async def request(method, path, params=None):
+    async def request(token, method, path, params=None):
+        headers = {"Authorization": "Bearer " + token}
         try:
             async with session.request(
                 method, API + path, headers=headers, params=params,
@@ -49,7 +50,9 @@ async def async_setup(hass, config):
             raise HomeAssistantError("Unable to read or update Todoist") from err
 
     async def recent(entity):
-        project = settings["projects"].get(entity)
+        runtime = hass.data[DOMAIN]
+        settings = runtime["entry"] or runtime["legacy"]
+        project = settings["projects"].get(entity) if settings else None
         if not project:
             raise HomeAssistantError("This chore list is not configured")
         now = datetime.now(timezone.utc)
@@ -58,18 +61,18 @@ async def async_setup(hass, config):
         items = []
         cursors = set()
         while True:
-            page = await request("GET", "/tasks/completed/by_completion_date", params)
+            page = await request(settings["token"], "GET", "/tasks/completed/by_completion_date", params)
             items.extend(item for item in page["items"] if str(item.get("project_id")) == project)
             cursor = page.get("next_cursor")
             if not cursor:
-                return items
+                return items, settings["token"]
             if cursor in cursors:
                 raise HomeAssistantError("Todoist returned a repeated page")
             cursors.add(cursor)
             params["cursor"] = cursor
 
     async def get_recent(call):
-        items = await recent(call.data["entity_id"])
+        items, _ = await recent(call.data["entity_id"])
         return {"items": [{
             "uid": str(item["id"]),
             "summary": item["content"],
@@ -80,13 +83,13 @@ async def async_setup(hass, config):
     async def reopen(call):
         entity = call.data["entity_id"]
         uid = call.data["item"]
-        items = await recent(entity)
+        items, token = await recent(entity)
         item = next((entry for entry in items if str(entry["id"]) == uid), None)
         if not item:
             raise HomeAssistantError("This completion is no longer in the last 24 hours")
         if (item.get("due") or {}).get("is_recurring"):
             raise HomeAssistantError("Reopen recurring occurrences in Todoist")
-        await request("POST", f"/tasks/{uid}/reopen")
+        await request(token, "POST", f"/tasks/{uid}/reopen")
 
     entity_schema = vol.Schema({vol.Required("entity_id"): cv.entity_id})
     hass.services.async_register(
@@ -97,4 +100,14 @@ async def async_setup(hass, config):
         DOMAIN, "reopen", reopen,
         schema=entity_schema.extend({vol.Required("item"): IDENTIFIER}),
     )
+    return True
+
+
+async def async_setup_entry(hass, entry):
+    hass.data[DOMAIN]["entry"] = entry.data
+    return True
+
+
+async def async_unload_entry(hass, entry):
+    hass.data[DOMAIN]["entry"] = None
     return True
