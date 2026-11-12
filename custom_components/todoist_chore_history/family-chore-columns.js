@@ -80,13 +80,16 @@ class FamilyChoreColumns extends HTMLElement {
     this.pending.add(item.uid);
     this.render();
     try {
-      await this.home.callService("todoist_chore_history", "reopen", {
-        entity_id: this.config.entity, item: item.uid,
-      });
-      this.completed = this.completed.filter(row => row.uid !== item.uid);
+      await this.home.callService("todo", "update_item", {
+        item: item.uid, status: "needs_action",
+      }, { entity_id: this.config.entity });
+      const uid = String(item.uid);
+      this.completed = this.completed.filter(row => row.uid !== uid);
+      this.awaitingHistory.delete(uid);
+      this.error = "";
       await this.refresh();
     } catch {
-      this.error = "Could not reopen this chore in Todoist.";
+      this.error = "Could not reopen this chore. Try again.";
     } finally {
       this.pending.delete(item.uid);
       this.render();
@@ -260,7 +263,7 @@ class FamilyChoreColumns extends HTMLElement {
         const row = document.createElement("li");
         row.className = "chore-row";
         const finished = index === 0;
-        const readOnly = finished && (item.recurring || item.awaitingHistory);
+        const note = finished && (item.recurring || item.awaitingHistory);
         const check = document.createElement("button");
         check.className = "chore-check";
         check.type = "button";
@@ -268,7 +271,7 @@ class FamilyChoreColumns extends HTMLElement {
         check.setAttribute("aria-checked", String(finished));
         check.setAttribute("aria-label", `${finished ? "Reopen" : "Complete"} ${item.summary}`);
         check.textContent = finished ? "☑" : "☐";
-        check.disabled = readOnly || this.pending.has(item.uid);
+        check.disabled = this.pending.has(item.uid);
         check.addEventListener("click", () => void (finished ? this.reopen(item) : this.complete(item)));
         const details = document.createElement("div");
         const title = document.createElement(finished ? "span" : "button");
@@ -289,7 +292,7 @@ class FamilyChoreColumns extends HTMLElement {
         const date = document.createElement("small");
         date.textContent = finished ? new Date(item.completedAt).toLocaleDateString() : item.date;
         details.append(date);
-        if (readOnly) {
+        if (note) {
           const status = document.createElement("small");
           status.textContent = item.awaitingHistory ? "Waiting for Todoist history" : "Recurring completion";
           details.append(status);

@@ -1,6 +1,6 @@
 # Todoist Chore History
 
-Home Assistant integration and dashboard card for per-project Todoist chores. Shows the rolling 24-hour completion history and can reopen completed non-recurring chores. Recurring completions appear as read-only entries.
+Home Assistant integration and dashboard card for per-project Todoist chores. Shows the rolling 24-hour completion history and can reopen any recently completed chore, recurring or not.
 
 ## Install
 
@@ -10,10 +10,10 @@ Restart Home Assistant after installing. Open **Settings → Devices & services 
 
 An existing YAML setup keeps working. After verifying the web setup, you can remove the old integration block and its dedicated secret if nothing else uses it.
 
-In **Settings → Dashboards → Resources**, register the following URL as a **JavaScript module**. If replacing an earlier version of the card, edit its existing resource instead of keeping two entries.
+In **Settings → Dashboards → Resources**, register the following URL as a **JavaScript module**, with `?v=` set to the version in `manifest.json` (prevents your browser from serving a stale cached copy after an update). If replacing an earlier version of the card, edit its existing resource instead of keeping two entries.
 
 ```text
-/todoist_chore_history/family-chore-columns.js
+/todoist_chore_history/family-chore-columns.js?v=0.2.4
 ```
 
 Use one card per person's view:
@@ -27,5 +27,5 @@ Verify that a known recent completion appears. Use a disposable non-recurring ta
 
 ## Update
 
-Download the newer version in HACS and restart Home Assistant. Refresh the dashboard so it loads the bundled card. Manual installs can update by replacing the entire integration folder before restarting.
+Download the newer version in HACS and restart Home Assistant. Bump the `?v=` on the registered resource URL to the new version and hard-refresh the dashboard (Ctrl+Shift+R) so it loads the bundled card instead of a cached copy. Manual installs can update by replacing the entire integration folder before restarting.
 
