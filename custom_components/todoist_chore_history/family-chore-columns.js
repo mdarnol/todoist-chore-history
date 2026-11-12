@@ -83,22 +83,66 @@ class FamilyChoreColumns extends HTMLElement {
     }
   }
 
+  formatDateOnly(dateStr) {
+    if (!dateStr) return "";
+    const [year, month, day] = dateStr.slice(0, 10).split("-").map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString();
+  }
+
+  animateMove(uid, fromRect) {
+    if (!fromRect) return;
+    const toRow = this.shadowRoot.querySelector(`[data-uid="${uid}"]`);
+    if (!toRow) return;
+    const toRect = toRow.getBoundingClientRect();
+    const dx = fromRect.left - toRect.left;
+    const dy = fromRect.top - toRect.top;
+    if (!dx && !dy) return;
+    toRow.style.position = "relative";
+    toRow.style.zIndex = "1";
+    toRow.style.transform = `translate(${dx}px, ${dy}px)`;
+    requestAnimationFrame(() => {
+      toRow.style.transition = "transform 280ms ease";
+      toRow.style.transform = "translate(0, 0)";
+    });
+    toRow.addEventListener("transitionend", () => {
+      toRow.style.transition = "";
+      toRow.style.transform = "";
+      toRow.style.position = "";
+      toRow.style.zIndex = "";
+    }, { once: true });
+  }
+
   async reopen(item) {
     if (this.pending.has(item.uid)) return;
     this.pending.add(item.uid);
+    const uid = String(item.uid);
+    const fromRow = this.shadowRoot.querySelector(`[data-uid="${uid}"]`);
+    const fromRect = fromRow?.getBoundingClientRect();
+    const previousCompleted = this.completed;
+    const previousItems = this.items;
+    const previousAwaiting = new Map(this.awaitingHistory);
+
+    this.reopened.set(uid, item.completedAt);
+    this.completed = this.completed.filter(row => row.uid !== uid);
+    this.awaitingHistory.delete(uid);
+    this.items = [...this.items.filter(row => row.uid !== item.uid), {
+      ...item, uid, status: "needs_action", due: item.dueDate || null,
+    }];
+    this.error = "";
     this.render();
+    this.animateMove(uid, fromRect);
+
     try {
       await this.home.callService("todo", "update_item", {
         item: item.uid, status: "needs_action",
         ...(item.dueDate ? { due_date: item.dueDate } : {}),
       }, { entity_id: this.config.entity });
-      const uid = String(item.uid);
-      this.reopened.set(uid, item.completedAt);
-      this.completed = this.completed.filter(row => row.uid !== uid);
-      this.awaitingHistory.delete(uid);
-      this.error = "";
       await this.refresh();
     } catch {
+      this.reopened.delete(uid);
+      this.completed = previousCompleted;
+      this.items = previousItems;
+      this.awaitingHistory = previousAwaiting;
       this.error = "Could not reopen this chore. Try again.";
     } finally {
       this.pending.delete(item.uid);
@@ -276,6 +320,7 @@ class FamilyChoreColumns extends HTMLElement {
       for (const item of items) {
         const row = document.createElement("li");
         row.className = "chore-row";
+        row.dataset.uid = String(item.uid);
         const finished = index === 0;
         const note = finished && (item.recurring || item.awaitingHistory);
         const check = document.createElement("button");
@@ -304,8 +349,15 @@ class FamilyChoreColumns extends HTMLElement {
           details.append(description);
         }
         const date = document.createElement("small");
-        date.textContent = finished ? new Date(item.completedAt).toLocaleDateString() : item.date;
+        date.textContent = finished
+          ? `Completed ${new Date(item.completedAt).toLocaleDateString()}`
+          : item.date;
         details.append(date);
+        if (finished && item.dueDate) {
+          const due = document.createElement("small");
+          due.textContent = `Due ${this.formatDateOnly(item.dueDate)}`;
+          details.append(due);
+        }
         if (note) {
           const status = document.createElement("small");
           status.textContent = item.awaitingHistory ? "Waiting for Todoist history" : "Recurring completion";
