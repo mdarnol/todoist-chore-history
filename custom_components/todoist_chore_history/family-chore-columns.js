@@ -83,10 +83,10 @@ class FamilyChoreColumns extends HTMLElement {
     }
   }
 
-  formatDateOnly(dateStr) {
+  formatDateOnly(dateStr, options) {
     if (!dateStr) return "";
     const [year, month, day] = dateStr.slice(0, 10).split("-").map(Number);
-    return new Date(year, month - 1, day).toLocaleDateString();
+    return new Date(year, month - 1, day).toLocaleDateString(undefined, options);
   }
 
   animateMove(uid, fromRect) {
@@ -246,6 +246,8 @@ class FamilyChoreColumns extends HTMLElement {
     const day = offset => new Date(Date.parse(today) + offset * 86400000).toISOString().slice(0, 10);
     const tomorrow = day(1);
     const end = day(7);
+    this.todayKey = today;
+    this.tomorrowKey = tomorrow;
     const buckets = [[], [], [], []];
     const completed = [...this.completed, ...this.awaitingHistory.values()]
       .filter(item => item.completedAt >= Date.now() - 86400000)
@@ -305,8 +307,14 @@ class FamilyChoreColumns extends HTMLElement {
     error.hidden = !this.error;
     error.textContent = this.error ?? "";
     const columns = this.shadowRoot.querySelector(".columns");
-    const titles = ["Recently Completed", "Overdue", "Today", "Tomorrow", "Next 7 Days"];
-    this.groups().forEach((items, index) => {
+    const groups = this.groups();
+    const titles = [
+      "Recently Completed", "Overdue",
+      `Today (${this.formatDateOnly(this.todayKey, { month: "short", day: "numeric" })})`,
+      `Tomorrow (${this.formatDateOnly(this.tomorrowKey, { month: "short", day: "numeric" })})`,
+      "Next 7 Days",
+    ];
+    groups.forEach((items, index) => {
       const section = document.createElement("section");
       const heading = document.createElement("h2");
       heading.textContent = titles[index];
