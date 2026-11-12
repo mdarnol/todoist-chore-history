@@ -6,11 +6,15 @@ class FamilyChoreColumns extends HTMLElement {
     this.completed = [];
     this.pending = new Set();
     this.awaitingHistory = new Map();
+    this.reopened = new Map();
   }
 
   setConfig(config) {
     if (!config.entity?.startsWith("todo.")) throw new Error("Set a todo entity.");
-    if (this.config?.entity !== config.entity) this.awaitingHistory.clear();
+    if (this.config?.entity !== config.entity) {
+      this.awaitingHistory.clear();
+      this.reopened.clear();
+    }
     this.config = config;
     this.items = [];
     this.completed = [];
@@ -63,6 +67,10 @@ class FamilyChoreColumns extends HTMLElement {
       for (const [uid, item] of this.awaitingHistory) {
         if (item.completedAt < Date.now() - 86400000) this.awaitingHistory.delete(uid);
       }
+      for (const [uid, completedAt] of this.reopened) {
+        const stillSuppressed = this.completed.some(row => row.uid === uid && row.completedAt === completedAt);
+        if (!stillSuppressed) this.reopened.delete(uid);
+      }
       const items = result.response?.[entity]?.items;
       if (!Array.isArray(items)) throw new Error("Missing list response");
       if (entity === this.config.entity) this.items = items;
@@ -84,6 +92,7 @@ class FamilyChoreColumns extends HTMLElement {
         item: item.uid, status: "needs_action",
       }, { entity_id: this.config.entity });
       const uid = String(item.uid);
+      this.reopened.set(uid, item.completedAt);
       this.completed = this.completed.filter(row => row.uid !== uid);
       this.awaitingHistory.delete(uid);
       this.error = "";
@@ -194,6 +203,7 @@ class FamilyChoreColumns extends HTMLElement {
     const buckets = [[], [], [], []];
     const completed = [...this.completed, ...this.awaitingHistory.values()]
       .filter(item => item.completedAt >= Date.now() - 86400000)
+      .filter(item => this.reopened.get(String(item.uid)) !== item.completedAt)
       .sort((a, b) => b.completedAt - a.completedAt);
     for (const item of this.items) {
       if (item.status === "completed" || !item.due) continue;
@@ -225,8 +235,10 @@ class FamilyChoreColumns extends HTMLElement {
       small { display:block; margin-top:5px; color:var(--secondary-text-color); }
       button { color:inherit; font:inherit; text-align:start; cursor:pointer; background:none;
         border:0; padding:0; width:100%; min-height:44px; }
-      .chore-row { display:grid; grid-template-columns:44px minmax(0,1fr); align-items:start; }
-      .chore-check { text-align:center; font-size:1.3rem; }
+      .chore-row { display:grid; grid-template-columns:64px minmax(0,1fr); align-items:stretch; }
+      .chore-check { text-align:center; font-size:2.25rem; display:flex; align-items:center;
+        justify-content:center; border-radius:8px; }
+      .chore-check:active:not(:disabled) { background:var(--divider-color); }
       .chore-title:is(button):hover { text-decoration:underline; }
       .chore-editor { box-sizing:border-box; width:min(480px, calc(100vw - 32px));
         border:1px solid var(--divider-color); border-radius:12px; padding:20px;
