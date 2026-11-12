@@ -76,6 +76,7 @@ async def async_setup(hass, config):
         return {"items": [{
             "uid": str(item["id"]),
             "summary": item["content"],
+            "description": item.get("description") or "",
             "completedAt": item["completed_at"],
             "recurring": bool((item.get("due") or {}).get("is_recurring")),
         } for item in items if item.get("completed_at")]}
