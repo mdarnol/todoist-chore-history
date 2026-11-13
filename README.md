@@ -1,6 +1,6 @@
 # Todoist Chore History
 
-Home Assistant integration and dashboard card for per-project Todoist chores. Shows the rolling 24-hour completion history and can reopen any recently completed chore, recurring or not.
+Home Assistant integration and dashboard card for per-project Todoist chores. Shows the rolling 24-hour completion history and can reopen a recently completed chore. Recurring chores already advance to their next occurrence the moment they're completed, so their completions are shown for reference but can't be reopened from the card — undo those in Todoist directly if needed.
 
 ## Install
 
@@ -13,8 +13,8 @@ An existing YAML setup keeps working. After verifying the web setup, you can rem
 In **Settings → Dashboards → Resources**, register the following URLs as **JavaScript modules**, with `?v=` set to the version in `manifest.json` (prevents your browser from serving a stale cached copy after an update). If replacing an earlier version of a card, edit its existing resource instead of keeping two entries.
 
 ```text
-/todoist_chore_history/family-chore-columns.js?v=0.2.13
-/todoist_chore_history/family-photo-wall.js?v=0.2.13
+/todoist_chore_history/family-chore-columns.js?v=0.2.14
+/todoist_chore_history/family-photo-wall.js?v=0.2.14
 ```
 
 Use one chore card per person's view. An optional `color` tints that person's Overdue and Today columns at 20% opacity:

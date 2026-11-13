@@ -124,6 +124,15 @@ class FamilyChoreColumns extends HTMLElement {
 
   async reopen(item) {
     if (this.pending.has(item.uid)) return;
+    if (item.recurring) {
+      // Completing a recurring task advances Todoist's live occurrence to a new due
+      // date immediately; the "completed" entry we show is only history. Writing the
+      // old due date back onto that already-advanced task fights Todoist's own
+      // recurrence engine and produces a second, wrong-looking completion.
+      this.error = "Recurring chores can't be reopened here — edit the due date in Todoist if you need to undo this.";
+      this.render();
+      return;
+    }
     this.pending.add(item.uid);
     const uid = String(item.uid);
     const fromRow = this.shadowRoot.querySelector(`[data-uid="${uid}"]`);
@@ -350,14 +359,19 @@ class FamilyChoreColumns extends HTMLElement {
         row.dataset.uid = String(item.uid);
         const finished = index === 0;
         const note = finished && (item.recurring || item.awaitingHistory);
+        const locked = finished && item.recurring;
         const check = document.createElement("button");
         check.className = "chore-check";
         check.type = "button";
         check.setAttribute("role", "checkbox");
         check.setAttribute("aria-checked", String(finished));
-        check.setAttribute("aria-label", `${finished ? "Reopen" : "Complete"} ${item.summary}`);
+        check.setAttribute("aria-label", locked
+          ? `${item.summary} is a recurring chore and can't be reopened here`
+          : `${finished ? "Reopen" : "Complete"} ${item.summary}`);
         check.textContent = finished ? "☑" : "☐";
-        check.disabled = this.pending.has(item.uid);
+        check.disabled = locked || this.pending.has(item.uid);
+        check.style.opacity = locked ? "0.4" : "";
+        check.style.cursor = locked ? "default" : "";
         check.addEventListener("click", () => void (finished ? this.reopen(item) : this.complete(item)));
         const details = document.createElement("div");
         const title = document.createElement(finished ? "span" : "button");
