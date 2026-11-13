@@ -37,6 +37,11 @@ async def async_setup(hass, config):
             str(Path(__file__).with_name("family-photo-wall.js")),
             False,
         ),
+        StaticPathConfig(
+            "/todoist_chore_history/family-add-chore-button.js",
+            str(Path(__file__).with_name("family-add-chore-button.js")),
+            False,
+        ),
     ])
     session = async_get_clientsession(hass)
 

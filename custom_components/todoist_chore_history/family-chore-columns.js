@@ -264,6 +264,51 @@ class FamilyChoreColumns extends HTMLElement {
     dialog.showModal();
   }
 
+  add() {
+    const dialog = document.createElement("dialog");
+    dialog.className = "chore-editor";
+    dialog.innerHTML = `<form>
+      <h2>Add chore</h2>
+      <label>Name<input name="summary" required></label>
+      <label>Description<textarea name="description" rows="5"></textarea></label>
+      <label>Due date<input name="due" type="date"></label>
+      <p role="alert" hidden></p>
+      <footer><button type="button">Cancel</button><button type="submit">Add</button></footer>
+    </form>`;
+    const form = dialog.querySelector("form");
+    const { summary, description, due } = form.elements;
+    const entity = this.config.entity;
+    const cancel = dialog.querySelector('button[type="button"]');
+    const save = dialog.querySelector('button[type="submit"]');
+    const error = dialog.querySelector('[role="alert"]');
+    cancel.addEventListener("click", () => dialog.close());
+    dialog.addEventListener("close", () => dialog.remove(), { once: true });
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      const name = summary.value.trim();
+      if (!name) {
+        error.textContent = "Enter a chore name.";
+        error.hidden = false;
+        return;
+      }
+      save.disabled = true;
+      const data = { item: name };
+      if (description.value) data.description = description.value;
+      if (due.value) data.due_date = due.value;
+      try {
+        await this.home.callService("todo", "add_item", data, { entity_id: entity });
+        dialog.close();
+        await this.refresh();
+      } catch {
+        error.textContent = "Could not add this chore. Try again.";
+        error.hidden = false;
+        save.disabled = false;
+      }
+    });
+    this.shadowRoot.append(dialog);
+    dialog.showModal();
+  }
+
   groups() {
     const zone = this.home?.config?.time_zone;
     const formatter = new Intl.DateTimeFormat("en-CA", {
@@ -329,11 +374,16 @@ class FamilyChoreColumns extends HTMLElement {
         border-radius:4px; padding:8px; }
       .chore-editor footer { display:flex; justify-content:flex-end; gap:12px; }
       .chore-editor button { width:auto; padding:0 12px; color:var(--primary-color); }
+      .toolbar { display:flex; justify-content:flex-end; padding:12px 12px 0; }
+      .add-chore { width:auto; min-height:auto; padding:8px 14px; font-weight:600;
+        border:1px solid var(--divider-color); border-radius:8px; }
+      .add-chore:hover { background:var(--divider-color); }
       @media(max-width:850px) {
         .columns { grid-template-columns:1fr; }
         section { border-inline-start:0; border-block-end:1px solid var(--divider-color); }
       }
-    </style><p role="status" hidden></p><div class="columns"></div>`;
+    </style><div class="toolbar"><button type="button" class="add-chore">+ Add Chore</button></div><p role="status" hidden></p><div class="columns"></div>`;
+    this.shadowRoot.querySelector(".add-chore").addEventListener("click", () => this.add());
     const error = this.shadowRoot.querySelector("p");
     error.hidden = !this.error;
     error.textContent = this.error ?? "";
