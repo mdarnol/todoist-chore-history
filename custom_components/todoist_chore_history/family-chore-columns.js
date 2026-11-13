@@ -124,15 +124,6 @@ class FamilyChoreColumns extends HTMLElement {
 
   async reopen(item) {
     if (this.pending.has(item.uid)) return;
-    if (item.recurring) {
-      // Completing a recurring task advances Todoist's live occurrence to a new due
-      // date immediately; the "completed" entry we show is only history. Writing the
-      // old due date back onto that already-advanced task fights Todoist's own
-      // recurrence engine and produces a second, wrong-looking completion.
-      this.error = "Recurring chores can't be reopened here — edit the due date in Todoist if you need to undo this.";
-      this.render();
-      return;
-    }
     this.pending.add(item.uid);
     const uid = String(item.uid);
     const fromRow = this.shadowRoot.querySelector(`[data-uid="${uid}"]`);
@@ -152,13 +143,28 @@ class FamilyChoreColumns extends HTMLElement {
     this.animateMove(uid, fromRect);
 
     try {
-      await this.home.callService("todo", "update_item", {
-        item: item.uid, status: "needs_action",
-      }, { entity_id: this.config.entity });
-      if (item.dueDate) {
+      if (item.recurring) {
+        // Todoist advances a recurring task to its next due date the instant it's
+        // completed — the live task was never "completed" to begin with, and per
+        // Todoist's own docs a completed occurrence can't be reopened through any
+        // interface. Sending a status/reopen call on it is what used to fight
+        // Todoist's recurrence engine and produce a second, wrong-looking completion.
+        // A plain due-date edit (no status touch) is the safe, supported way to pull
+        // the live task back onto today's list.
+        if (item.dueDate) {
+          await this.home.callService("todo", "update_item", {
+            item: item.uid, due_date: item.dueDate,
+          }, { entity_id: this.config.entity });
+        }
+      } else {
         await this.home.callService("todo", "update_item", {
-          item: item.uid, due_date: item.dueDate,
+          item: item.uid, status: "needs_action",
         }, { entity_id: this.config.entity });
+        if (item.dueDate) {
+          await this.home.callService("todo", "update_item", {
+            item: item.uid, due_date: item.dueDate,
+          }, { entity_id: this.config.entity });
+        }
       }
       // Todoist's read path can briefly lag the write, so give it a moment
       // before trusting a refresh over the optimistic state above.
@@ -359,19 +365,14 @@ class FamilyChoreColumns extends HTMLElement {
         row.dataset.uid = String(item.uid);
         const finished = index === 0;
         const note = finished && (item.recurring || item.awaitingHistory);
-        const locked = finished && item.recurring;
         const check = document.createElement("button");
         check.className = "chore-check";
         check.type = "button";
         check.setAttribute("role", "checkbox");
         check.setAttribute("aria-checked", String(finished));
-        check.setAttribute("aria-label", locked
-          ? `${item.summary} is a recurring chore and can't be reopened here`
-          : `${finished ? "Reopen" : "Complete"} ${item.summary}`);
+        check.setAttribute("aria-label", `${finished ? "Reopen" : "Complete"} ${item.summary}`);
         check.textContent = finished ? "☑" : "☐";
-        check.disabled = locked || this.pending.has(item.uid);
-        check.style.opacity = locked ? "0.4" : "";
-        check.style.cursor = locked ? "default" : "";
+        check.disabled = this.pending.has(item.uid);
         check.addEventListener("click", () => void (finished ? this.reopen(item) : this.complete(item)));
         const details = document.createElement("div");
         const title = document.createElement(finished ? "span" : "button");
