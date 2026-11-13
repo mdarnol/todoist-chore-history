@@ -11,6 +11,7 @@ from homeassistant.core import SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.storage import Store
 
 DOMAIN = "todoist_chore_history"
 API = "https://api.todoist.com/api/v1"
@@ -25,7 +26,11 @@ CONFIG_SCHEMA = vol.Schema({
 
 async def async_setup(hass, config):
     settings = config.get(DOMAIN)
-    hass.data[DOMAIN] = {"legacy": settings, "entry": None}
+    store = Store(hass, 1, f"{DOMAIN}_dismissed")
+    dismissed = {tuple(pair) for pair in (await store.async_load() or [])}
+    hass.data[DOMAIN] = {
+        "legacy": settings, "entry": None, "store": store, "dismissed": dismissed,
+    }
     await hass.http.async_register_static_paths([
         StaticPathConfig(
             "/todoist_chore_history/family-chore-columns.js",
@@ -87,6 +92,7 @@ async def async_setup(hass, config):
     async def get_recent(call):
         entity = call.data["entity_id"]
         items, token = await recent(entity)
+        dismissed = hass.data[DOMAIN]["dismissed"]
         history = [{
             "uid": str(item["id"]),
             "summary": item["content"],
@@ -94,7 +100,8 @@ async def async_setup(hass, config):
             "completedAt": item["completed_at"],
             "recurring": bool((item.get("due") or {}).get("is_recurring")),
             "dueDate": local_date((item.get("due") or {}).get("date")),
-        } for item in items if item.get("completed_at")]
+        } for item in items if item.get("completed_at")
+          and (str(item["id"]), item["completed_at"]) not in dismissed]
 
         runtime = hass.data[DOMAIN]
         project = (runtime["entry"] or runtime["legacy"])["projects"][entity]
@@ -123,6 +130,8 @@ async def async_setup(hass, config):
                 key = (uid, timestamp)
                 if not since <= timestamp < now or key in seen:
                     continue
+                if (uid, completed_at) in dismissed:
+                    continue
                 seen.add(key)
                 history.append({
                     "uid": uid,
@@ -137,11 +146,20 @@ async def async_setup(hass, config):
                 })
             cursor = page.get("next_cursor")
             if not cursor:
+                pruned = {pair for pair in dismissed if datetime.fromisoformat(pair[1]) >= since}
+                if pruned != dismissed:
+                    hass.data[DOMAIN]["dismissed"] = pruned
+                    await hass.data[DOMAIN]["store"].async_save([list(pair) for pair in pruned])
                 return {"items": history}
             if cursor in cursors:
                 raise HomeAssistantError("Todoist returned a repeated activity page")
             cursors.add(cursor)
             params["cursor"] = cursor
+
+    async def dismiss(call):
+        dismissed = hass.data[DOMAIN]["dismissed"]
+        dismissed.add((call.data["item"], call.data["completed_at"]))
+        await hass.data[DOMAIN]["store"].async_save([list(pair) for pair in dismissed])
 
     async def reopen(call):
         entity = call.data["entity_id"]
@@ -162,6 +180,13 @@ async def async_setup(hass, config):
     hass.services.async_register(
         DOMAIN, "reopen", reopen,
         schema=entity_schema.extend({vol.Required("item"): IDENTIFIER}),
+    )
+    hass.services.async_register(
+        DOMAIN, "dismiss", dismiss,
+        schema=vol.Schema({
+            vol.Required("item"): IDENTIFIER,
+            vol.Required("completed_at"): cv.string,
+        }),
     )
     return True
 

@@ -1,6 +1,6 @@
 # Todoist Chore History
 
-Home Assistant integration and dashboard card for per-project Todoist chores. Shows the rolling 24-hour completion history and can reopen a recently completed chore. Recurring chores advance to their next occurrence the moment they're completed — Todoist itself doesn't support undoing that completion, so "reopening" one instead moves its due date back onto today's list without touching the completion record.
+Home Assistant integration and dashboard card for per-project Todoist chores. Shows the rolling 24-hour completion history and can reopen a recently completed chore. Recurring chores advance to their next occurrence the moment they're completed — Todoist itself doesn't support undoing or deleting that completion, so "reopening" one instead moves its due date back onto today's list and asks the integration to hide that specific completion record from Recently Completed, so it won't reappear on a refresh or page reload.
 
 ## Install
 
@@ -13,9 +13,9 @@ An existing YAML setup keeps working. After verifying the web setup, you can rem
 In **Settings → Dashboards → Resources**, register the following URLs as **JavaScript modules**, with `?v=` set to the version in `manifest.json` (prevents your browser from serving a stale cached copy after an update). If replacing an earlier version of a card, edit its existing resource instead of keeping two entries.
 
 ```text
-/todoist_chore_history/family-chore-columns.js?v=0.2.16
-/todoist_chore_history/family-photo-wall.js?v=0.2.16
-/todoist_chore_history/family-add-chore-button.js?v=0.2.16
+/todoist_chore_history/family-chore-columns.js?v=0.2.17
+/todoist_chore_history/family-photo-wall.js?v=0.2.17
+/todoist_chore_history/family-add-chore-button.js?v=0.2.17
 ```
 
 Use one chore card per person's view. An optional `color` tints that person's Overdue and Today columns at 20% opacity, and a "+ Add Chore" button is always shown above the columns:

@@ -55,7 +55,7 @@ class FamilyChoreColumns extends HTMLElement {
       const historyItems = history?.response?.items;
       if (Array.isArray(historyItems)) {
         this.completed = historyItems.map(item => ({
-          ...item, completedAt: Date.parse(item.completedAt),
+          ...item, completedAt: Date.parse(item.completedAt), completedAtRaw: item.completedAt,
         }));
         for (const item of this.completed) {
           const waiting = this.awaitingHistory.get(item.uid);
@@ -155,6 +155,17 @@ class FamilyChoreColumns extends HTMLElement {
           await this.home.callService("todo", "update_item", {
             item: item.uid, due_date: item.dueDate,
           }, { entity_id: this.config.entity });
+        }
+        // Todoist keeps the completion record permanently — there's no way to
+        // delete it — so tell the backend to hide this specific occurrence from
+        // get_recent going forward. Without this it reappears in Recently
+        // Completed on the next refresh or page reload.
+        if (item.completedAtRaw) {
+          try {
+            await this.home.callService("todoist_chore_history", "dismiss", {
+              item: item.uid, completed_at: item.completedAtRaw,
+            });
+          } catch { /* best-effort: client-side suppression still hides it this session */ }
         }
       } else {
         await this.home.callService("todo", "update_item", {
