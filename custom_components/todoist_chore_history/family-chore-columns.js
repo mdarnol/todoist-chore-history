@@ -385,7 +385,7 @@ class FamilyChoreColumns extends HTMLElement {
         border-radius:4px; padding:8px; }
       .chore-editor footer { display:flex; justify-content:flex-end; gap:12px; }
       .chore-editor button { width:auto; padding:0 12px; color:var(--primary-color); }
-      .toolbar { display:flex; justify-content:flex-end; padding:12px 12px 0; }
+      .toolbar { display:flex; justify-content:flex-start; padding:12px 12px 0; }
       .add-chore { width:auto; min-height:auto; padding:8px 14px; font-weight:600;
         border:1px solid var(--divider-color); border-radius:8px; }
       .add-chore:hover { background:var(--divider-color); }
