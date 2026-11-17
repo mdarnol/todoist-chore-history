@@ -13,9 +13,9 @@ An existing YAML setup keeps working. After verifying the web setup, you can rem
 In **Settings → Dashboards → Resources**, register the following URLs as **JavaScript modules**, with `?v=` set to the version in `manifest.json` (prevents your browser from serving a stale cached copy after an update). If replacing an earlier version of a card, edit its existing resource instead of keeping two entries.
 
 ```text
-/todoist_chore_history/family-chore-columns.js?v=0.2.19
+/todoist_chore_history/family-chore-columns.js?v=0.2.20
 /todoist_chore_history/family-photo-wall.js?v=0.2.19
-/todoist_chore_history/family-add-chore-button.js?v=0.2.19
+/todoist_chore_history/family-add-chore-button.js?v=0.2.20
 ```
 
 Use one chore card per person's view. An optional `color` tints that person's Overdue and Today columns at 20% opacity, and a "+ Add Chore" button is always shown above the columns:
@@ -25,6 +25,8 @@ type: custom:family-chore-columns
 entity: todo.example_chores
 color: "#f9a8d4"
 ```
+
+The "Add chore" dialog (on both cards) has a **Repeats** checkbox for creating a recurring chore. Checking it swaps the due-date field for a free-text field (e.g. `every day`, `every Monday`) sent to Todoist as its natural-language due string, which sets up the recurrence directly — this bypasses Home Assistant's generic to-do service, which has no way to create a repeating task.
 
 `family-add-chore-button` is a small standalone card: a single "+ Add chore" button that opens the same add-chore dialog, for wiring onto a plain `todo-list` card elsewhere (e.g. the shared family dashboard) rather than the full `family-chore-columns` card. Set `default_due: today` to pre-fill today's date in the dialog:
 

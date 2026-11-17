@@ -50,11 +50,11 @@ async def async_setup(hass, config):
     ])
     session = async_get_clientsession(hass)
 
-    async def request(token, method, path, params=None):
+    async def request(token, method, path, params=None, json=None):
         headers = {"Authorization": "Bearer " + token}
         try:
             async with session.request(
-                method, API + path, headers=headers, params=params,
+                method, API + path, headers=headers, params=params, json=json,
                 timeout=ClientTimeout(total=15), allow_redirects=False,
             ) as response:
                 if response.status >= 300:
@@ -172,6 +172,22 @@ async def async_setup(hass, config):
             raise HomeAssistantError("Reopen recurring occurrences in Todoist")
         await request(token, "POST", f"/tasks/{uid}/reopen")
 
+    async def add_recurring(call):
+        entity = call.data["entity_id"]
+        runtime = hass.data[DOMAIN]
+        settings = runtime["entry"] or runtime["legacy"]
+        project = settings["projects"].get(entity) if settings else None
+        if not project:
+            raise HomeAssistantError("This chore list is not configured")
+        body = {
+            "content": call.data["item"],
+            "project_id": project,
+            "due_string": call.data["due_string"],
+        }
+        if call.data.get("description"):
+            body["description"] = call.data["description"]
+        await request(settings["token"], "POST", "/tasks", json=body)
+
     entity_schema = vol.Schema({vol.Required("entity_id"): cv.entity_id})
     hass.services.async_register(
         DOMAIN, "get_recent", get_recent, schema=entity_schema,
@@ -186,6 +202,14 @@ async def async_setup(hass, config):
         schema=vol.Schema({
             vol.Required("item"): IDENTIFIER,
             vol.Required("completed_at"): cv.string,
+        }),
+    )
+    hass.services.async_register(
+        DOMAIN, "add_recurring", add_recurring,
+        schema=entity_schema.extend({
+            vol.Required("item"): cv.string,
+            vol.Required("due_string"): cv.string,
+            vol.Optional("description"): cv.string,
         }),
     )
     return True

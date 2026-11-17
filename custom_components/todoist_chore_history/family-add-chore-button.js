@@ -22,14 +22,23 @@ class FamilyAddChoreButton extends HTMLElement {
       <label>Name<input name="summary" required></label>
       <label>Description<textarea name="description" rows="5"></textarea></label>
       <label>Due date<input name="due" type="date"></label>
+      <label class="repeat-toggle"><input name="repeats" type="checkbox"> Repeats</label>
+      <label class="repeat-field" hidden>Repeat<input name="repeatString" placeholder="every day"></label>
       <p role="alert" hidden></p>
       <footer><button type="button">Cancel</button><button type="submit">Add</button></footer>
     </form>`;
     const form = dialog.querySelector("form");
-    const { summary, description, due } = form.elements;
+    const { summary, description, due, repeats, repeatString } = form.elements;
     if (this.config.default_due === "today") {
       due.value = new Date().toLocaleDateString("en-CA");
     }
+    const dueLabel = due.closest("label");
+    const repeatLabel = repeatString.closest("label");
+    repeats.addEventListener("change", () => {
+      dueLabel.hidden = repeats.checked;
+      repeatLabel.hidden = !repeats.checked;
+      if (repeats.checked && !repeatString.value) repeatString.value = "every day";
+    });
     const entity = this.config.entity;
     const cancel = dialog.querySelector('button[type="button"]');
     const save = dialog.querySelector('button[type="submit"]');
@@ -44,12 +53,23 @@ class FamilyAddChoreButton extends HTMLElement {
         error.hidden = false;
         return;
       }
+      if (repeats.checked && !repeatString.value.trim()) {
+        error.textContent = "Describe how often this chore repeats.";
+        error.hidden = false;
+        return;
+      }
       save.disabled = true;
-      const data = { item: name };
-      if (description.value) data.description = description.value;
-      if (due.value) data.due_date = due.value;
       try {
-        await this.home.callService("todo", "add_item", data, { entity_id: entity });
+        if (repeats.checked) {
+          const data = { entity_id: entity, item: name, due_string: repeatString.value.trim() };
+          if (description.value) data.description = description.value;
+          await this.home.callService("todoist_chore_history", "add_recurring", data);
+        } else {
+          const data = { item: name };
+          if (description.value) data.description = description.value;
+          if (due.value) data.due_date = due.value;
+          await this.home.callService("todo", "add_item", data, { entity_id: entity });
+        }
         dialog.close();
       } catch {
         error.textContent = "Could not add this chore. Try again.";
@@ -73,6 +93,8 @@ class FamilyAddChoreButton extends HTMLElement {
         color:var(--primary-text-color); background:var(--card-background-color, white); }
       .chore-editor::backdrop { background:rgb(0 0 0 / .5); }
       .chore-editor label { display:grid; gap:4px; margin:12px 0; }
+      .chore-editor .repeat-toggle { display:flex; flex-direction:row-reverse; justify-content:flex-end;
+        align-items:center; gap:8px; }
       .chore-editor input, .chore-editor textarea { font:inherit; color:inherit;
         background:var(--secondary-background-color); border:1px solid var(--divider-color);
         border-radius:4px; padding:8px; }
