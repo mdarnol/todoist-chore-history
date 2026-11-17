@@ -438,7 +438,15 @@ class FamilyChoreColumns extends HTMLElement {
         const details = document.createElement("div");
         const title = document.createElement(finished ? "span" : "button");
         title.className = "chore-title";
-        title.textContent = item.summary;
+        if (finished && item.recurring) {
+          const repeatIcon = document.createElement("ha-icon");
+          repeatIcon.setAttribute("icon", "mdi:repeat");
+          repeatIcon.setAttribute("aria-hidden", "true");
+          repeatIcon.style.cssText = "--mdc-icon-size:16px; margin-inline-end:4px; " +
+            "vertical-align:-3px; color:var(--secondary-text-color);";
+          title.append(repeatIcon);
+        }
+        title.append(document.createTextNode(item.summary));
         if (!finished) {
           title.type = "button";
           title.setAttribute("aria-label", `Edit ${item.summary}`);
